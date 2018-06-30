@@ -3,7 +3,6 @@ const mqtt = require('mqtt');
 const clc = require('cli-color');
 const Table = require('cli-table');
 const figlet = require('figlet');
-const fs = require('fs');
 
 const colors = ['green', 'yellow', 'blue', 'magenta', 'cyan'];
 const state = {
@@ -26,6 +25,9 @@ async function init() {
       state.connections[index].error = err.message;
     });
     client.on('close', () => {
+      if (state.connections[index].status == 'kill') {
+        return;
+      }
       if (state.connections[index].reconnect >= 3) {
         state.connections[index].status = 'backoff';
         return client.end(true);
@@ -52,6 +54,8 @@ async function init() {
         status = clc.yellow(`${con.status} (${con.reconnect})`);
       } else if (con.status == 'error' || con.status == 'backoff') {
         status = clc.red(con.status);
+      } else if (con.status == 'kill') {
+        return;
       }
       var row = [`${i}${state.current == i ? '*':''}`, con.url, con.clientId, con.username, con.password, status, con.error || ''];
       if (!con.save) {
@@ -105,7 +109,8 @@ async function init() {
           con.url == options.url &&
           con.clientId == options.clientId &&
           con.username == options.username &&
-          con.status != 'backoff'
+          con.status != 'backoff' &&
+          con.status != 'kill'
         );
         if (recents.length) {
           return false;
@@ -224,6 +229,31 @@ async function init() {
     })
     .action((args, callback) => {
       state.current = args.number;
+      callback();
+    });
+
+  vorpal
+    .command('kill [number]', 'Kill a mqtt connections.')
+    .autocomplete({
+      data: () => state.connections.map((v, i) => `${i}`)
+    })
+    .validate((args) => {
+      if ('number' in args && state.connections.length > args.number) {
+        return true
+      }
+      return clc.red('invalid connection number');
+    })
+    .action((args, callback) => {
+      var { number } = args;
+      state.connections[number].client.end(true);
+      state.connections[number].status = 'kill';
+      var connections = state.connections.filter(con => con.status != 'kill')
+        .map(({url, clientId, username, password}) => ({url, clientId, username, password}));
+      vorpal.localStorage.setItem('connections', JSON.stringify(connections));
+      if (number == state.current) {
+        state.current == undefined;
+      }
+      lsConnections();
       callback();
     });
 
