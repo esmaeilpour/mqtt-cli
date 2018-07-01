@@ -3,6 +3,7 @@ const mqtt = require('mqtt');
 const clc = require('cli-color');
 const Table = require('cli-table');
 const figlet = require('figlet');
+const fs = require('fs');
 
 const colors = ['green', 'yellow', 'blue', 'magenta', 'cyan'];
 const state = {
@@ -11,6 +12,16 @@ const state = {
 };
 
 async function init() {
+
+  function dupConnection(options) {
+    return state.connections.some(({url, clientId, username, status}) =>
+      url == options.url &&
+      clientId == options.clientId &&
+      username == options.username &&
+      status != 'backoff' &&
+      status != 'kill'
+    );
+  }
 
   function addConnection(options) {
     var index = state.connections.length;
@@ -78,8 +89,12 @@ async function init() {
   }
 
   function reloadConnections() {
-    var connections = JSON.parse(vorpal.localStorage.getItem('connections') || '[]');
-    connections.forEach(opts => addConnection({save: true, ...opts}));
+    try {
+      JSON.parse(vorpal.localStorage.getItem('connections') || '[]').forEach(opts => addConnection({save: true, ...opts}));
+      JSON.parse(fs.readFileSync('./mqtt-cli.json').toString()).filter(opts => !dupConnection(opts)).forEach(opts => addConnection({save: true, ...opts}));
+    } catch(e) {
+      void(0);
+    }
     lsConnections();
   }
 
@@ -104,26 +119,17 @@ async function init() {
         return 'the username required by your broker';
       } else if (!options.password) {
         return 'the password required by your broker';
-      } else {
-        var recents = state.connections.filter(con =>
-          con.url == options.url &&
-          con.clientId == options.clientId &&
-          con.username == options.username &&
-          con.status != 'backoff' &&
-          con.status != 'kill'
-        );
-        if (recents.length) {
-          return false;
-        }
       }
       return true;
     })
     .action((args, callback) => {
-      var { index, save } = addConnection(args.options);
-      if (save) {
-        saveConnection(args.options);
+      if (!dupConnection(args.options)) {
+        var { index, save } = addConnection(args.options);
+        if (save) {
+          saveConnection(args.options);
+        }
+        state.current = index;
       }
-      state.current = index;
       lsConnections();
       callback();
     });
@@ -141,6 +147,9 @@ async function init() {
     .option('-p, --payload <payload>', 'the message to publish.')
     .option('-q, --qos <qos>', 'the QoS.')
     .option('--js2json', 'convert payload to json before publishing.')
+    .types({
+      string: ['t', 'topic']
+    })
     .validate((args) => {
       var { options } = args;
       if (!checkConnection(state.current)) {
@@ -162,13 +171,16 @@ async function init() {
           vorpal.log(e);
         }
       }
-      client.publish(topic, payload, {qos}, callback);
+      client.publish(topic, Buffer(payload), {qos}, () => callback());
     });
 
   vorpal
     .command('sub', 'Subscribe topic.')
     .option('-t, --topic <topic>', 'the topic to subscribe.')
     .option('-q, --qos <qos>', 'the QoS.')
+    .types({
+      string: ['t', 'topic']
+    })
     .validate((args) => {
       var { options } = args;
       if (!checkConnection(state.current)) {
@@ -194,6 +206,9 @@ async function init() {
   vorpal
     .command('unsub', 'Unsubscribe topic.')
     .option('-t, --topic <topic>', 'the topic to unsubscribe.')
+    .types({
+      string: ['t', 'topic']
+    })
     .validate((args) => {
       var { options } = args;
       if (!checkConnection(state.current)) {
