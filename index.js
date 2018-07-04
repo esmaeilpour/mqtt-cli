@@ -47,6 +47,9 @@ async function init() {
       state.connections[index].reconnect++;
     });
     client.on('message', (topic, message, packet) => {
+      if (connection.silent) {
+        return false;
+      }
       vorpal.log(color(`${index}> delivered to ${options.username}/${options.clientId} ${topic} ${message.toString()}`));
     });
     state.connections.push(connection);
@@ -142,6 +145,44 @@ async function init() {
     });
 
   vorpal
+    .command('use [number]', 'Use a mqtt connections.')
+    .autocomplete({
+      data: () => state.connections.map((v, i) => `${i}`)
+    })
+    .validate((args) => {
+      if ('number' in args && checkConnection(args.number)) {
+        return true
+      }
+      return clc.red('please check connection status');
+    })
+    .action((args, callback) => {
+      state.current = args.number;
+      callback();
+    });
+
+  vorpal
+    .command('silent [number]', 'Silent a mqtt connections.')
+    .option('--off', 'disable silent.')
+    .autocomplete({
+      data: () => state.connections.map((v, i) => `${i}`)
+    })
+    .validate((args) => {
+      if ('number' in args && state.connections.length > args.number) {
+        return true
+      }
+      return clc.red('invalid connection number');
+    })
+    .action((args, callback) => {
+      var { number, options: { off } } = args;
+      if (off) {
+        delete state.connections[number].silent;
+      } else {
+        state.connections[number].silent = true;
+      }
+      callback();
+    });
+
+  vorpal
     .command('pub', 'Publish message to mqtt.')
     .option('-t, --topic <topic>', 'the topic to publish.')
     .option('-p, --payload <payload>', 'the message to publish.')
@@ -230,23 +271,23 @@ async function init() {
       }
       client.unsubscribe(topic, callback);
     });
-
+    
   vorpal
-    .command('use [number]', 'Use a mqtt connections.')
-    .autocomplete({
-      data: () => state.connections.map((v, i) => `${i}`)
-    })
+    .command('save', 'Save current connection.')
     .validate((args) => {
-      if ('number' in args && checkConnection(args.number)) {
+      if (checkConnection(state.current)) {
         return true
       }
-      return clc.red('please check connection status');
+      return clc.red('please use a connection and check its status');
     })
     .action((args, callback) => {
-      state.current = args.number;
+      var connection = state.connections[state.current];
+      saveConnection(connection);
+      
+      state.connections[state.current].save = true;
       callback();
     });
-
+  
   vorpal
     .command('kill [number]', 'Kill a mqtt connections.')
     .autocomplete({
@@ -272,22 +313,6 @@ async function init() {
       callback();
     });
 
-  vorpal
-    .command('save', 'Save current connection.')
-    .validate((args) => {
-      if (checkConnection(state.current)) {
-        return true
-      }
-      return clc.red('please use a connection and check its status');
-    })
-    .action((args, callback) => {
-      var connection = state.connections[state.current];
-      saveConnection(connection);
-      
-      state.connections[state.current].save = true;
-      callback();
-    });
-  
   vorpal
     .command('restart', 'Restart.')
     .action((args, callback) => {
