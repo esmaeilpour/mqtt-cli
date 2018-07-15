@@ -234,14 +234,7 @@ async function init() {
     .action((args, callback) => {
       var { options: {topic, qos} } = args;
       var client  = state.connections[state.current].client;
-      if (args.options.js2json) {
-        try {
-          payload = JSON.stringify(eval('(' + payload + ')'));
-        } catch(e) {
-          vorpal.log(e);
-        }
-      }
-      client.subscribe(topic, {qos}, callback);
+      client.subscribe(topic, {qos: qos || 1}, () => callback());
     });
 
   vorpal
@@ -262,14 +255,7 @@ async function init() {
     .action((args, callback) => {
       var { options: {topic, qos} } = args;
       var client  = state.connections[state.current].client;
-      if (args.options.js2json) {
-        try {
-          payload = JSON.stringify(eval('(' + payload + ')'));
-        } catch(e) {
-          vorpal.log(e);
-        }
-      }
-      client.unsubscribe(topic, callback);
+      client.unsubscribe(topic, () => callback());
     });
     
   vorpal
