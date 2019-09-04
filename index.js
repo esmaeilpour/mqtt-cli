@@ -14,7 +14,7 @@ const state = {
 async function init() {
 
   function dupConnection(options) {
-    return state.connections.some(({url, clientId, username, status}) =>
+    return state.connections.some(({ url, clientId, username, status }) =>
       url == options.url &&
       clientId == options.clientId &&
       username == options.username &&
@@ -26,8 +26,8 @@ async function init() {
   function addConnection(options) {
     var index = state.connections.length;
     var color = clc[colors[index % 6]];
-    var client = mqtt.connect(options.url, {reconnectPeriod: 5000, ...options});
-    var connection = {index, color, client, reconnect: 0, status: 'connecting', ...options};
+    var client = mqtt.connect(options.url, { reconnectPeriod: 5000, ...options });
+    var connection = { index, color, client, reconnect: 0, status: 'connecting', ...options };
     client.on('connect', () => {
       state.connections[index].status = 'connected';
     });
@@ -62,7 +62,7 @@ async function init() {
     });
     state.connections.forEach((con, i) => {
       let status = clc.blue('connecting');
-      if(con.status == 'connected') {
+      if (con.status == 'connected') {
         status = clc.green(con.status);
       } else if (con.status == 'reconnect') {
         status = clc.yellow(`${con.status} (${con.reconnect})`);
@@ -71,7 +71,7 @@ async function init() {
       } else if (con.status == 'kill') {
         return;
       }
-      var row = [`${i}${state.current == i ? '*':''}`, con.url, con.clientId, con.username, con.password, status, con.error || ''];
+      var row = [`${i}${state.current == i ? '*' : ''}`, con.url, con.clientId, con.username, con.password, status, con.error || ''];
       if (!con.save) {
         row = row.map(c => clc.inverse(c));
       }
@@ -85,18 +85,18 @@ async function init() {
       state.connections[index].status == 'connected';
   }
 
-  function saveConnection({url, clientId, username, password}) {
+  function saveConnection({ url, clientId, username, password }) {
     var connections = JSON.parse(vorpal.localStorage.getItem('connections') || '[]');
-    connections.push({url, clientId, username, password});
+    connections.push({ url, clientId, username, password });
     vorpal.localStorage.setItem('connections', JSON.stringify(connections));
   }
 
   function reloadConnections() {
     try {
-      JSON.parse(vorpal.localStorage.getItem('connections') || '[]').forEach(opts => addConnection({save: true, ...opts}));
-      JSON.parse(fs.readFileSync('./mqtt-cli.json').toString()).filter(opts => !dupConnection(opts)).forEach(opts => addConnection({save: true, ...opts}));
-    } catch(e) {
-      void(0);
+      JSON.parse(vorpal.localStorage.getItem('connections') || '[]').forEach(opts => addConnection({ save: true, ...opts }));
+      JSON.parse(fs.readFileSync('./connections.json').toString()).filter(opts => !dupConnection(opts)).forEach(opts => addConnection({ save: true, ...opts }));
+    } catch (e) {
+      void (0);
     }
     lsConnections();
   }
@@ -183,7 +183,7 @@ async function init() {
     });
 
   vorpal
-    .command('pub', 'Publish message to mqtt.')
+    .command('pub', 'Publish message to the topic.')
     .option('-t, --topic <topic>', 'the topic to publish.')
     .option('-p, --payload <payload>', 'the message to publish.')
     .option('-q, --qos <qos>', 'the QoS.')
@@ -203,16 +203,16 @@ async function init() {
       return true;
     })
     .action((args, callback) => {
-      var { options: {topic, payload, qos} } = args;
-      var client  = state.connections[state.current].client;
+      var { options: { topic, payload, qos } } = args;
+      var client = state.connections[state.current].client;
       if (args.options.js2json) {
         try {
           payload = JSON.stringify(eval('(' + payload + ')'));
-        } catch(e) {
+        } catch (e) {
           vorpal.log(e);
         }
       }
-      client.publish(topic, Buffer(payload), {qos}, () => callback());
+      client.publish(topic, Buffer.from(payload), { qos }, () => callback());
     });
 
   vorpal
@@ -232,9 +232,9 @@ async function init() {
       return true;
     })
     .action((args, callback) => {
-      var { options: {topic, qos} } = args;
-      var client  = state.connections[state.current].client;
-      client.subscribe(topic, {qos: qos || 1}, () => callback());
+      var { options: { topic, qos } } = args;
+      var client = state.connections[state.current].client;
+      client.subscribe(topic, { qos: qos || 1 }, () => callback());
     });
 
   vorpal
@@ -253,11 +253,11 @@ async function init() {
       return true;
     })
     .action((args, callback) => {
-      var { options: {topic, qos} } = args;
-      var client  = state.connections[state.current].client;
+      var { options: { topic, qos } } = args;
+      var client = state.connections[state.current].client;
       client.unsubscribe(topic, () => callback());
     });
-    
+
   vorpal
     .command('save', 'Save current connection.')
     .validate((args) => {
@@ -269,11 +269,11 @@ async function init() {
     .action((args, callback) => {
       var connection = state.connections[state.current];
       saveConnection(connection);
-      
+
       state.connections[state.current].save = true;
       callback();
     });
-  
+
   vorpal
     .command('kill [number]', 'Kill a mqtt connections.')
     .autocomplete({
@@ -290,7 +290,7 @@ async function init() {
       state.connections[number].client.end(true);
       state.connections[number].status = 'kill';
       var connections = state.connections.filter(con => con.status != 'kill')
-        .map(({url, clientId, username, password}) => ({url, clientId, username, password}));
+        .map(({ url, clientId, username, password }) => ({ url, clientId, username, password }));
       vorpal.localStorage.setItem('connections', JSON.stringify(connections));
       if (number == state.current) {
         state.current == undefined;
@@ -309,15 +309,15 @@ async function init() {
       callback();
     });
 
-  figlet('Mqtt Cli', function(err, data) {
-      if (err) return
-        vorpal
-          .history('mqtt-cli')
-          .localStorage('mqtt-cli')
-          .log(data)
-          .delimiter('mqtt$')
-          .show();
-      reloadConnections();
+  figlet('Mqtt Cli', function (err, data) {
+    if (err) return
+    vorpal
+      .history('mqtt-cli')
+      .localStorage('mqtt-cli')
+      .log(data)
+      .delimiter('mqtt$')
+      .show();
+    reloadConnections();
   });
 }
 

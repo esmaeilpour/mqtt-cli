@@ -1,0 +1,16 @@
+[
+	{
+		"url": "mqtt://broker.hivemq.com",
+		"clientId": "123456",
+		"username": "guest1",
+		"password": "123456",
+		"clean": false
+	},
+	{
+		"url": "mqtt://broker.hivemq.com",
+		"clientId": "654321",
+		"username": "guest2",
+		"password": "123456",
+		"clean": false
+	}
+]

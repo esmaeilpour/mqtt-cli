@@ -1,9 +1,0 @@
-[
-	{
-        	"url": "mqtt://127.0.0.1:1883",
-	        "clientId": "123456",
-	        "username": "admin",
-	        "password": "admin",
-	        "clean": false
-        }
-]
